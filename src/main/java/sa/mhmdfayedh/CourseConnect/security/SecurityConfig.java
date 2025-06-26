@@ -1,59 +1,94 @@
 package sa.mhmdfayedh.CourseConnect.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
-import org.springframework.security.provisioning.JdbcUserDetailsManager;
-import org.springframework.security.provisioning.UserDetailsManager;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import sa.mhmdfayedh.CourseConnect.dto.v1.ErrorResponseDTO;
 
-import javax.sql.DataSource;
-
+@EnableMethodSecurity(prePostEnabled = true)
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public UserDetailsManager userDetailsManager(DataSource dataSource){
-        JdbcUserDetailsManager jdbcUserDetailsManager = new JdbcUserDetailsManager(dataSource);
 
-        // Retrieve user by username
-        jdbcUserDetailsManager.setUsersByUsernameQuery("SELECT username, password, is_active AS enabled FROM users where username = ?");
+    private final JwtFilter jwtFilter;
 
-        // Retrieve roles by username
-        jdbcUserDetailsManager.setAuthoritiesByUsernameQuery("SELECT username, role AS authority FROM users where username = ?");
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
 
-        return jdbcUserDetailsManager;
+    public SecurityConfig(JwtFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
     }
+
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.authorizeHttpRequests(configurer ->
-                configurer
-                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("INSTRUCTOR", "STUDENT")
-                        .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("INSTRUCTOR", "STUDENT")
-                        .requestMatchers(HttpMethod.PUT, "/api/users").hasAnyRole("INSTRUCTOR", "STUDENT")
-                        .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasAnyRole("INSTRUCTOR", "STUDENT")
-
-                        .requestMatchers(HttpMethod.POST, "/api/courses").hasRole("INSTRUCTOR")
-                        .requestMatchers(HttpMethod.GET, "/api/courses/*/students").hasRole("INSTRUCTOR")
-                        .requestMatchers(HttpMethod.GET, "/api/courses").hasAnyRole("INSTRUCTOR", "STUDENT")
-                        .requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyRole("INSTRUCTOR", "STUDENT")
-                        .requestMatchers(HttpMethod.PUT, "/api/courses").hasRole("INSTRUCTOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/courses/**").hasRole("INSTRUCTOR")
-                        .requestMatchers(HttpMethod.POST, "/api/courses/register").hasRole("STUDENT")
 
 
-        );
-
-        httpSecurity.httpBasic(Customizer.withDefaults());
-
-        httpSecurity.csrf(csrf -> csrf.disable());
-
-        return httpSecurity.build();
+        return httpSecurity.csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/users/login",
+                                "/api/v1/users/register",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**", // TODO Add login page
+                                "/docs",
+                                "/actuator/health",
+                                "/api/admin/system-metrics",
+                                "/api/v1/courses")
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(e -> e.accessDeniedHandler(accessDeniedHandler()))
+                .build();
     }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+        AuthenticationManagerBuilder authManagerBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        authManagerBuilder
+                .userDetailsService(userDetailsService)
+                .passwordEncoder(passwordEncoder());
+        return authManagerBuilder.build();
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, accessDeniedException) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+
+            ErrorResponseDTO error = new ErrorResponseDTO(
+                    HttpServletResponse.SC_FORBIDDEN,
+                    "Forbidden",
+                    "You do not have permission to access this resource."
+            );
+
+            ObjectMapper mapper = new ObjectMapper();
+            response.getWriter().write(mapper.writeValueAsString(error));
+        };
+    }
+
+
+
 
 }
