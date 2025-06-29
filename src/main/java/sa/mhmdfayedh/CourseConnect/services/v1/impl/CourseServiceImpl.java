@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import sa.mhmdfayedh.CourseConnect.common.exceptions.UserNotFoundException;
 import sa.mhmdfayedh.CourseConnect.common.mappers.CourseMapper;
 import sa.mhmdfayedh.CourseConnect.common.mappers.UserMapper;
+import sa.mhmdfayedh.CourseConnect.common.utils.AuthUtil;
+import sa.mhmdfayedh.CourseConnect.common.utils.PaginationUtils;
 import sa.mhmdfayedh.CourseConnect.dto.v1.*;
 import sa.mhmdfayedh.CourseConnect.common.enums.RoleEnum;
 import sa.mhmdfayedh.CourseConnect.common.exceptions.CourseNotFoundException;
@@ -33,39 +35,43 @@ public class CourseServiceImpl implements CourseService {
      private final LanguageService languageService;
      private final DifficultyLevelService difficultyLevelService;
      private final CacheManager cacheManager;
+     private final AuthUtil authUtil;
 
     @Autowired
-    public CourseServiceImpl(CourseDAO courseDAO, UserDAO userDAO, LanguageService languageService, DifficultyLevelService difficultyLevelService, CacheManager cacheManager){
+    public CourseServiceImpl(CourseDAO courseDAO,
+                             UserDAO userDAO,
+                             LanguageService languageService,
+                             DifficultyLevelService difficultyLevelService,
+                             CacheManager cacheManager,
+                             AuthUtil authUtil){
         this.courseDAO = courseDAO;
         this.userDAO = userDAO;
         this.languageService = languageService;
         this.difficultyLevelService = difficultyLevelService;
         this.cacheManager = cacheManager;
+        this.authUtil = authUtil;
     }
 
     @Transactional
-    public CreateCourseResponseDTO createCourse(CreateCourseRequestDTO courseRequestDTO) {
+    public ResponseDTO<CourseDTO> createCourse(CreateCourseRequestDTO courseRequestDTO) {
         if (courseRequestDTO == null){
             throw new IllegalArgumentException("Course cannot be null");
         }
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser  = userDAO.findByEmail(authentication.getName());
+        authUtil.requireSelfOrAdmin(courseRequestDTO.getInstructorId(), "You are not authorized to create a course for another instructor");
 
-        if (courseRequestDTO.getInstructorId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new IllegalArgumentException("You are not authorized to create a course for another instructor");
-        }
 
         User instructor = userDAO.findById(courseRequestDTO.getInstructorId());
+
         if (instructor == null) {
             throw new UserNotFoundException("Instructor was not found");
         }
+
         Language language = languageService.findLanguageById(courseRequestDTO.getLanguageId());
         DifficultyLevel difficultyLevel = difficultyLevelService.findDifficultyLevelById(courseRequestDTO.getDifficultLevelId());
 
         if (!RoleEnum.ROLE_INSTRUCTOR.getDisplyName().equals(instructor.getRole().getName())) {
-            throw new RuntimeException("User is not instructor");
+            throw new IllegalArgumentException("User is not instructor");
         }
 
 
@@ -77,18 +83,17 @@ public class CourseServiceImpl implements CourseService {
 
         Course course = this.courseDAO.save(mappedCourse);
 
-        CreateCourseResponseDTO dto = new CreateCourseResponseDTO();
+        return ResponseDTO
+                .<CourseDTO>builder()
+                .statusCode(HttpStatus.CREATED.value())
+                .message("Course created successfully!")
+                .data(CourseMapper.toDTOList(List.of(course)))
+                .build();
 
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.CREATED.value());
-        dto.setMessage("Course created successfully!");
-        dto.setData(CourseMapper.toDTOList(List.of(course)));
-
-        return dto;
     }
 
 
-    public GetCourseResponseDTO findCourseById(int id){
+    public ResponseDTO<CourseDTO> findCourseById(int id){
 
         Cache courseCache = cacheManager.getCache("courseCache");
         Course course = courseCache != null ? courseCache.get(id, Course.class) : null;
@@ -101,19 +106,18 @@ public class CourseServiceImpl implements CourseService {
             }
         }
 
-        GetCourseResponseDTO dto = new GetCourseResponseDTO();
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Course retrieved successfully");
-        dto.setData(CourseMapper.toDTOList(List.of(course)));
+        return ResponseDTO
+                .<CourseDTO>builder()
+                .message("Course retrieved successfully")
+                .data(CourseMapper.toDTOList(List.of(course)))
+                .build();
 
-        return dto;
     }
 
 
-    public GetCoursesResponseDTO findAllCourses(int pageNumber, String sort){
+    public ResponseDTO<CourseDTO> findAllCourses(int pageNumber, String sort){
         List<Course> courses;
-        Long CoursesCount = courseDAO.countCourses();
+        int coursesCount = courseDAO.countCourses();
 
         if (sort != null && !sort.isBlank()) {
             courses = courseDAO.findAll(pageNumber, sort);
@@ -122,30 +126,27 @@ public class CourseServiceImpl implements CourseService {
         }
 
 
-        GetCoursesResponseDTO dto = new GetCoursesResponseDTO();
-        PaginationDTO pagination = new PaginationDTO();
+
 
         String message = courses.isEmpty() ? "No courses found" : "Courses retrieved successfully";
 
-        pagination.setSize(courses.size());
-        pagination.setTotalElements(CoursesCount);
-        pagination.setTotalPages((CoursesCount + 30 - 1 ) / 30);
-        pagination.setPage(pageNumber);
-        pagination.setFirst(pageNumber == 1);
-        pagination.setLast(pageNumber == (CoursesCount + 30 - 1) / 30 );
 
-        dto.setData(CourseMapper.toDTOList(courses));
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage(message);
-        dto.setPagination(pagination);
+        PaginationDTO pagination = PaginationUtils
+                .createPagination(courses,
+                        coursesCount,
+                        pageNumber,
+                        30);
 
-
-        return dto;
+        return ResponseDTO
+                .<CourseDTO>builder()
+                .message(message)
+                .data(CourseMapper.toDTOList(courses))
+                .pagination(pagination)
+                .build();
     }
 
     @Transactional
-    public UpdateCourseResponseDTO updateCourse(UpdateCourseRequestDTO course){
+    public ResponseDTO<CourseDTO> updateCourse(UpdateCourseRequestDTO course){
         if (course == null){
             throw new IllegalArgumentException("Course cannot be null");
         }
@@ -155,34 +156,22 @@ public class CourseServiceImpl implements CourseService {
         if (coursePrev.getInstructor() == null) {
             throw new RuntimeException("This course has no instructor assigned. Cannot proceed with update.");
         }
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = userDAO.findByEmail(authentication.getName());
 
-        if (coursePrev.getInstructor().getId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to update a course for another instructor");
-        }
+        authUtil.requireSelfOrAdmin(coursePrev.getInstructor().getId(),
+                "You are not authorized to update a course for another instructor");
 
-        if (course.getInstructorId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to update a course to another instructor");
-
-        }
+        authUtil.requireSelfOrAdmin(course.getInstructorId(),
+                "You are not authorized to update a course to another instructor");
 
         Language language = languageService.findLanguageById(course.getLanguageId());
         DifficultyLevel difficultyLevel = difficultyLevelService.findDifficultyLevelById(course.getDifficultLevelId());
 
         Course courseEntity = CourseMapper.toEntity(course);
 
-        courseEntity.setInstructor(currentUser);
+        courseEntity.setInstructor(authUtil.getCurrentUser());
         courseEntity.setLanguage(language);
         courseEntity.setDifficultLevel(difficultyLevel);
         courseEntity.setCreatedAt(coursePrev.getCreatedAt());
-
-
-        if (!currentUser.getRole().getName().equals(RoleEnum.ROLE_INSTRUCTOR.getDisplyName())){
-            throw new IllegalArgumentException("User is not an instructor with the id passed: " + courseEntity.getInstructor().getId());
-        }
 
         this.courseDAO.update(courseEntity);
 
@@ -191,95 +180,65 @@ public class CourseServiceImpl implements CourseService {
             cache.put(courseEntity.getId(), courseEntity);
         }
 
-        UpdateCourseResponseDTO dto = new UpdateCourseResponseDTO();
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Course updated successfully");
-        dto.setData(CourseMapper.toDTOList(List.of(courseEntity)));
+        return ResponseDTO
+                .<CourseDTO>builder()
+                .message("Course updated successfully")
+                .data(CourseMapper.toDTOList(List.of(courseEntity)))
+                .build();
 
-        return dto;
     }
 
     @Transactional
-    public DeleteCourseResponseDTO deleteCourse(int id){
+    public ResponseDTO<CourseDTO> deleteCourse(int id){
         Course course = this.courseDAO.findById(id);
         if (course == null){
             throw new CourseNotFoundException("Course with ID "+ id + " does not exist.");
         }
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser  = userDAO.findByEmail(authentication.getName());
-
-
-        if (course.getInstructor().getId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to delete a course for another instructor");
-        }
+        authUtil.requireSelfOrAdmin(course.getInstructor().getId(),
+                "You are not authorized to delete a course for another instructor");
 
         this.courseDAO.deleteById(id);
 
-        DeleteCourseResponseDTO dto = new DeleteCourseResponseDTO();
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Course deleted successfully");
+        Cache cache = cacheManager.getCache("courseCache");
+        if (cache != null) {
+            cache.evict(id);
+        }
 
-        return dto;
+        return ResponseDTO.<CourseDTO>builder().message("Course deleted successfully").build();
     }
 
     @Transactional
-    public CourseEnrollmentResponseDTO courseEnrollment(CourseEnrollmentRequestDTO requestDTO){
-        if (requestDTO.getCourseId() == 0 || requestDTO.getStudentId() == 0){
-            throw new IllegalArgumentException("Course/Student id  cannot be null");
-        }
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser  = userDAO.findByEmail(authentication.getName());
-
-
-
-
+    public ResponseDTO<CourseDTO> courseEnrollment(CourseEnrollmentRequestDTO requestDTO){
         Course course = courseDAO.findById(requestDTO.getCourseId());
         User student = userDAO.findById(requestDTO.getStudentId());
 
-        if (course == null) {
-            throw new CourseNotFoundException("Course not found with ID: " + requestDTO.getCourseId());
-        }
-        if (student == null){
-            throw new UserNotFoundException("Student not found with ID: " + requestDTO.getCourseId());
-        }
-
-        if (student.getId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to register a course for another stduent");
+        if (course == null || student == null) {
+            if (course == null) {
+                throw new CourseNotFoundException("Course not found with ID: " + requestDTO.getCourseId());
+            }
+            throw new UserNotFoundException("Student not found with ID: " + requestDTO.getStudentId());
         }
 
-
-
-        if (!student.getRole().getName().equals(RoleEnum.ROLE_STUDENT.getDisplyName())){
-            throw new IllegalArgumentException("Only student can register a course");
-        }
-
-
+        authUtil.requireSelfOrAdmin(student.getId(),
+                "You are not authorized to register a course for another student");
 
         student.addCourse(course);
         course.addUser(student);
 
         userDAO.update(student);
 
-        CourseEnrollmentResponseDTO dto = new CourseEnrollmentResponseDTO();
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Student registered successfully for the course: " + course.getTitle());
-
-        return dto;
+        return ResponseDTO
+                .<CourseDTO>builder()
+                .message("Student registered successfully for the course: " + course.getTitle())
+                .build();
     }
 
 
-    public GetUsersResponseDTO getCourseAndStudents(int id, int pageNumber){
+    public ResponseDTO<UserDTO> getCourseAndStudents(int id, int pageNumber){
         Course courseAndStudents = courseDAO.findCourseAndStudentsByCourseId(id);
 
         if (courseAndStudents == null){
-            System.out.println("State of CourseAndStudents: " + courseAndStudents);
             throw new CourseNotFoundException("Course not found");
         }
 
@@ -287,29 +246,16 @@ public class CourseServiceImpl implements CourseService {
             throw new UserNotFoundException("Course's students not found");
         }
 
-        GetUsersResponseDTO dto = new GetUsersResponseDTO();
-        PaginationDTO pagination = new PaginationDTO();
 
-
-        pagination.setSize(courseAndStudents.getUsers().size());
-        pagination.setTotalElements(courseAndStudents.getUsers().size());
-        pagination.setTotalPages((courseAndStudents.getUsers().size() + 30 - 1 ) / 30);
-        pagination.setPage(pageNumber);
-        pagination.setFirst(pageNumber == 1);
-        pagination.setLast(pageNumber == (courseAndStudents.getUsers().size() + 30 - 1) / 30 );
-
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Students retrieved successfully for course ID: " + id);
-        dto.setPagination(pagination);
-        dto.setData(UserMapper.toDTOList(courseAndStudents.getUsers()));
-
-        return dto;
+        return ResponseDTO
+                .<UserDTO>builder()
+                .message("Students retrieved successfully for course ID: " + id)
+                .data(UserMapper.toDTOList(courseAndStudents.getUsers()))
+                .build();
     }
 
 
-    public GetCoursesResponseDTO getCourseByTitleAndPrice(int pageNumber,  String title, Double price){
+    public ResponseDTO<CourseDTO> getCourseByTitleAndPrice(int pageNumber,  String title, Double price){
         List<Course> courses;
 
 
@@ -323,28 +269,13 @@ public class CourseServiceImpl implements CourseService {
             courses = this.courseDAO.findAll(pageNumber);
         }
 
+       return ResponseDTO
+               .<CourseDTO>builder()
+                .message("Searched Courses Retrieved Successfully")
+                .data(CourseMapper.toDTOList(courses))
+               .pagination(null)
+               .build();
 
-
-        GetCoursesResponseDTO dto = new GetCoursesResponseDTO();
-        PaginationDTO pagination = new PaginationDTO();
-
-        pagination.setSize(courses.size());
-        pagination.setTotalElements(courses.size());
-        pagination.setTotalPages((courses.size() + 30 - 1 ) / 30);
-        pagination.setPage(pageNumber);
-        pagination.setFirst(pageNumber == 1);
-        pagination.setLast(pageNumber == (courses.size() + 30 - 1) / 30);
-
-
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("Searched Courses Retrieved Successfully");
-        dto.setData(CourseMapper.toDTOList(courses));
-        dto.setPagination(pagination);
-
-
-        return dto;
     }
 
 

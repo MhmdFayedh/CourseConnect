@@ -1,4 +1,4 @@
-package sa.mhmdfayedh.CourseConnect.common;
+package sa.mhmdfayedh.CourseConnect.common.utils;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 

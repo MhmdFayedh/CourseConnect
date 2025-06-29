@@ -1,5 +1,8 @@
 package sa.mhmdfayedh.CourseConnect.common.exceptions;
 
+import jakarta.persistence.PersistenceException;
+import org.hibernate.JDBCException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -7,23 +10,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import sa.mhmdfayedh.CourseConnect.dto.v1.ErrorResponseDTO;
 
-import java.time.ZonedDateTime;
 import java.util.Optional;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponseDTO> handleException(Exception e){
 
-        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Internal Server Error",
-                e.getMessage()
-        );
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(errorResponse);
-    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidationException(MethodArgumentNotValidException e){
@@ -32,25 +23,27 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .orElse("Invalid request data");
 
-        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
-                HttpStatus.BAD_REQUEST.value(),
-                "Validation Error",
-                validationMessage
-        );
+        ErrorResponseDTO error = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Error")
+                .message(validationMessage)
+                .build();
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
+                .body(error);
     }
 
 
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ErrorResponseDTO> handleRateLimitExceededException(RateLimitExceededException e) {
-        ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO();
-
-        errorResponseDTO.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        errorResponseDTO.setMessage(e.getMessage());
-        errorResponseDTO.setError("Rate Limit Exceeded");
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .message(e.getMessage())
+                .error("Rate Limit Exceeded")
+                .build();
 
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS.value())
@@ -59,11 +52,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CourseNotFoundException.class)
     public ResponseEntity<ErrorResponseDTO> handleCourseNotFoundException(CourseNotFoundException e){
-        ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO();
-        errorResponseDTO.setTimestamp(ZonedDateTime.now().toString());
-        errorResponseDTO.setStatus(HttpStatus.NOT_FOUND.value());
-        errorResponseDTO.setMessage(e.getMessage());
-        errorResponseDTO.setError("Course Not Found");
+        ErrorResponseDTO errorResponseDTO =  ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(e.getMessage())
+                .error("Course Not Found")
+                .build();
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND.value())
@@ -72,18 +66,88 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorResponseDTO> handleUserNotFoundException(UserNotFoundException e){
-        ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO();
-        errorResponseDTO.setTimestamp(ZonedDateTime.now().toString());
-        errorResponseDTO.setStatus(HttpStatus.NOT_FOUND.value());
-        errorResponseDTO.setMessage(e.getMessage());
-        errorResponseDTO.setError("User Not Found");
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(e.getMessage())
+                .error("User Not Found")
+                .build();
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND.value())
                 .body(errorResponseDTO);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidCredentialsException(InvalidCredentialsException e) {
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .message(e.getMessage())
+                .error("Invalid Credentials Exception")
+                .build();
 
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .body(errorResponseDTO);
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDataAccessException(DataAccessException e) {
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .message("Something went wrong")
+                .error("Internal Server Error")
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .body(errorResponseDTO);
+    }
+
+    @ExceptionHandler(PersistenceException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePersistenceException(PersistenceException e) {
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .message("Something went wrong")
+                .error("Internal Server Error")
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .body(errorResponseDTO);
+    }
+
+    @ExceptionHandler(JDBCException.class)
+    public ResponseEntity<ErrorResponseDTO> handleJDBCException(JDBCException e) {
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .message("Something went wrong")
+                .error("Internal Server Error")
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .body(errorResponseDTO);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponseDTO> handleException(Exception e){
+
+        ErrorResponseDTO errorResponseDTO = ErrorResponseDTO
+                .builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Internal Server Error")
+                .message(e.getMessage())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(errorResponseDTO);
+    }
 }
 
 

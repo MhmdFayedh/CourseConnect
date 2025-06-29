@@ -34,7 +34,7 @@ public interface UserController {
                             description = "Successfully retrieved a paginated list of users",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetUsersResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -54,7 +54,7 @@ public interface UserController {
                             description = "Successfully registered a new user and returned their details",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = RegisterUserResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -69,7 +69,7 @@ public interface UserController {
                             description = "Successfully retrieved the user details by ID",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetUserResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -85,7 +85,7 @@ public interface UserController {
                             description = "Successfully updated user information",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = UpdateUserResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -100,7 +100,7 @@ public interface UserController {
                             description = "Successfully deleted the user",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = UpdateUserResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }

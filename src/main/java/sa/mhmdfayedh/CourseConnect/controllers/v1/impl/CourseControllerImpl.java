@@ -14,7 +14,7 @@ import sa.mhmdfayedh.CourseConnect.services.v1.impl.UserServiceImpl;
 
 @RestController
 @RequestMapping("/api/v1/courses")
-@Tag(name = "Course Management", description = "Operations related to Courses")
+@Tag(name = "Course Management V1", description = "Operations related to Courses - V1")
 public class CourseControllerImpl implements CourseController {
     CourseServiceImpl courseService;
     UserServiceImpl userService;
@@ -28,9 +28,9 @@ public class CourseControllerImpl implements CourseController {
     @PostMapping("")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
     public ResponseEntity<?> createCourse(@RequestBody @Valid CreateCourseRequestDTO course){
-        CreateCourseResponseDTO responseDTO =  courseService.createCourse(course);
+        ResponseDTO<CourseDTO> response =  courseService.createCourse(course);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("")
@@ -41,43 +41,43 @@ public class CourseControllerImpl implements CourseController {
             @Parameter(description = "Sort order of courses, e.g., 'title' or 'price'")
             @RequestParam(required = false) String sort){
 
-        GetCoursesResponseDTO responseDTO = courseService.findAllCourses(pageNumber, sort);
+        ResponseDTO<CourseDTO> response = courseService.findAllCourses(pageNumber, sort);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR', 'STUDENT')")
     public ResponseEntity<?> getCourse(@Parameter(description = "Course ID", example = "3")
                                            @PathVariable int id){
-        GetCourseResponseDTO responseDTO = courseService.findCourseById(id);
+        ResponseDTO<CourseDTO> response = courseService.findCourseById(id);
 
-        return  ResponseEntity.ok(responseDTO);
+        return  ResponseEntity.ok(response);
     }
 
     @PutMapping("")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
     public ResponseEntity<?> updateCourse(@RequestBody @Valid UpdateCourseRequestDTO course) {
-        UpdateCourseResponseDTO responseDTO =  courseService.updateCourse(course);
+        ResponseDTO<CourseDTO> response =  courseService.updateCourse(course);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
     public ResponseEntity<?> deleteCourse(@Parameter(description = "Course ID", example = "3")
                                               @PathVariable int id) {
-        DeleteCourseResponseDTO responseDTO = this.courseService.deleteCourse(id);
+        ResponseDTO<CourseDTO> response = this.courseService.deleteCourse(id);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/enroll")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<?> courseEnroll(@RequestBody @Valid CourseEnrollmentRequestDTO requestDTO) {
-        CourseEnrollmentResponseDTO responseDTO = courseService.courseEnrollment(requestDTO);
+        ResponseDTO<CourseDTO> response = courseService.courseEnrollment(requestDTO);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}/students")
@@ -86,9 +86,9 @@ public class CourseControllerImpl implements CourseController {
                                                       @PathVariable int id,
                                                   @Parameter(description = "Page number for pagination", example = "1")
                                                   @RequestParam(defaultValue = "1") int pageNumber) {
-        GetUsersResponseDTO responseDTO = courseService.getCourseAndStudents(id, pageNumber);
+        ResponseDTO<UserDTO> response = courseService.getCourseAndStudents(id, pageNumber);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search")
@@ -100,9 +100,9 @@ public class CourseControllerImpl implements CourseController {
             @RequestParam(required = false) String title,
             @Parameter(description = "Price of the course where it's equals or less", example = "14.99")
             @RequestParam(required = false) Double price){
-        GetCoursesResponseDTO responseDTO = this.courseService.getCourseByTitleAndPrice(pageNumber, title, price);
+        ResponseDTO<CourseDTO> response = this.courseService.getCourseByTitleAndPrice(pageNumber, title, price);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
 }

@@ -22,7 +22,7 @@ public interface CourseController {
                             description = "Course created successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = CreateCourseResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -37,7 +37,7 @@ public interface CourseController {
                             description = "List of courses returned successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetCoursesResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -57,7 +57,7 @@ public interface CourseController {
                             description = "Course details returned successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetCourseResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -72,7 +72,7 @@ public interface CourseController {
                             description = "Course updated successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = UpdateCourseResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -88,7 +88,7 @@ public interface CourseController {
                             description = "Course deleted successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = DeleteCourseResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -104,7 +104,7 @@ public interface CourseController {
                             description = "User registered to course successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = CourseEnrollmentResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -119,7 +119,7 @@ public interface CourseController {
                             description = "List of enrolled students returned successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetUsersResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }
@@ -137,7 +137,7 @@ public interface CourseController {
                             description = "Filtered list of courses returned successfully",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = GetCoursesResponseDTO.class)
+                                    schema = @Schema(implementation = ResponseDTO.class)
                             )
                     )
             }

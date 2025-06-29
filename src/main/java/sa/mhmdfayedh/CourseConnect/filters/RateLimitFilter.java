@@ -25,9 +25,10 @@ public class RateLimitFilter implements Filter {
     private Bucket createNewBucket(){
         return Bucket
                 .builder()
-                .addLimit(Bandwidth.classic(1, Refill.greedy(1, Duration.ofMinutes(1))))
+                .addLimit(Bandwidth.classic(100, Refill.greedy(100, Duration.ofMinutes(1))))
                 .build();
     }
+
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         String clientIP  = servletRequest.getRemoteAddr();
@@ -40,11 +41,12 @@ public class RateLimitFilter implements Filter {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
 
-            ErrorResponseDTO error = new ErrorResponseDTO();
-            error.setTimestamp(ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-            error.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            error.setMessage("Rate limit exceeded. Please try again later.");
-            error.setError("Rate Limit Exceeded");
+            ErrorResponseDTO error = ErrorResponseDTO
+                    .builder()
+                    .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                    .message("Rate limit exceeded. Please try again later.")
+                    .error("Rate Limit Exceeded")
+                    .build();
 
             ObjectMapper mapper = new ObjectMapper();
             response.getWriter().write(mapper.writeValueAsString(error));

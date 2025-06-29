@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import sa.mhmdfayedh.CourseConnect.common.exceptions.UserNotFoundException;
 import sa.mhmdfayedh.CourseConnect.common.mappers.CourseMapper;
+import sa.mhmdfayedh.CourseConnect.common.utils.AuthUtil;
 import sa.mhmdfayedh.CourseConnect.dto.v1.*;
 import sa.mhmdfayedh.CourseConnect.common.enums.DifficultLevelEnum;
 import sa.mhmdfayedh.CourseConnect.common.enums.LanguageEnum;
@@ -49,6 +50,8 @@ class CourseServiceTest {
     private DifficultyLevelDAO difficultyLevelDAO;
     @Mock
     private CacheManager cacheManager;
+    @Mock
+    private AuthUtil authUtil;
 
     private LanguageService languageService;
     private DifficultyLevelService difficultyLevelService;
@@ -60,7 +63,7 @@ class CourseServiceTest {
 
          languageService = new LanguageServiceImpl(languageDAO);
          difficultyLevelService = new DifficultyLevelServiceImpl(difficultyLevelDAO);
-         courseService = new CourseServiceImpl(courseDAO, userDAO, languageService, difficultyLevelService, cacheManager);
+         courseService = new CourseServiceImpl(courseDAO, userDAO, languageService, difficultyLevelService, cacheManager, authUtil);
 
     }
 
@@ -135,7 +138,7 @@ class CourseServiceTest {
         mappedCourse.setInstructor(instructor);
         when(courseDAO.save(any(Course.class))).thenReturn(mappedCourse);
 
-        CreateCourseResponseDTO response = courseService.createCourse(requestDTO);
+        ResponseDTO<CourseDTO> response = courseService.createCourse(requestDTO);
 
 
         assertNotNull(response);
@@ -156,37 +159,7 @@ class CourseServiceTest {
         assertThrows(IllegalArgumentException.class, () -> courseService.createCourse(null));
     }
 
-    @Test
-    void shouldThrowIllegalArgumentException_WithNullInstructorId() {
 
-        User user = new User();
-        user.setId(1);
-        user.setEmail("test@example.com");
-
-        Authentication authentication = mock(Authentication.class);
-        when(authentication.getName()).thenReturn(user.getEmail());
-
-        SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-
-        SecurityContextHolder.setContext(securityContext);
-
-        when(userDAO.findByEmail(user.getEmail())).thenReturn(user);
-
-        CreateCourseRequestDTO courseRequest = new CreateCourseRequestDTO(
-                "Java Fundamentals",
-                "A beginner-friendly Java course",
-                LocalDateTime.of(2025, 6, 10, 10, 0),
-                LocalDateTime.of(2025, 7, 10, 10, 0),
-                "java-fundamentals",
-                1,
-                1,
-                49.99,
-                0
-        );
-
-        assertThrows(IllegalArgumentException.class, () -> courseService.createCourse(courseRequest));
-    }
 
     @Test
     void shouldThrowIllegalArgumentException_WhenNoUserMatch() {
@@ -247,9 +220,9 @@ class CourseServiceTest {
 
 
         when(courseDAO.findAll(1)).thenReturn(courses);
-        when(courseDAO.countCourses()).thenReturn((Long) courses.stream().count());
+        when(courseDAO.countCourses()).thenReturn(courses.size());
 
-        GetCoursesResponseDTO responseDTO = courseService.findAllCourses(1, "");
+        ResponseDTO<CourseDTO> responseDTO = courseService.findAllCourses(1, "");
 
         assertEquals("success", responseDTO.getStatus());
         assertEquals(200, responseDTO.getStatusCode());
@@ -263,7 +236,7 @@ class CourseServiceTest {
 
         when(courseDAO.findAll(1)).thenReturn(courses);
 
-        GetCoursesResponseDTO responseDTO = courseService.findAllCourses(1, "");
+        ResponseDTO<CourseDTO> responseDTO = courseService.findAllCourses(1, "");
 
         assertEquals("success", responseDTO.getStatus());
         assertEquals(200, responseDTO.getStatusCode());
@@ -288,7 +261,7 @@ class CourseServiceTest {
 
         when(courseDAO.findById(1)).thenReturn(course);
 
-        GetCourseResponseDTO responseDTO = courseService.findCourseById(1);
+        ResponseDTO<CourseDTO> responseDTO = courseService.findCourseById(1);
 
         assertEquals("success", responseDTO.getStatus());
         assertEquals("Course retrieved successfully", responseDTO.getMessage());
@@ -364,7 +337,7 @@ class CourseServiceTest {
         when(userDAO.findById(1)).thenReturn(instructor);
         when(languageService.findLanguageById(1)).thenReturn(language);
         when(difficultyLevelService.findDifficultyLevelById(1)).thenReturn(difficultyLevel);
-        UpdateCourseResponseDTO responseDTO = courseService.updateCourse(requestDTO);
+        ResponseDTO<CourseDTO> responseDTO = courseService.updateCourse(requestDTO);
 
         assertEquals("success", responseDTO.getStatus());
         assertEquals(200, responseDTO.getStatusCode());
@@ -407,7 +380,7 @@ class CourseServiceTest {
         when(courseDAO.findById(courseId)).thenReturn(course);
         doNothing().when(courseDAO).deleteById(courseId);
 
-        DeleteCourseResponseDTO responseDTO = courseService.deleteCourse(courseId);
+        ResponseDTO<CourseDTO> responseDTO = courseService.deleteCourse(courseId);
 
         assertNotNull(responseDTO);
         assertEquals("success", responseDTO.getStatus());

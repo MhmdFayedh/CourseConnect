@@ -94,7 +94,7 @@ public class UserDAOImpl implements UserDAO {
 
 
         if (results.isEmpty()){
-            throw new UserNotFoundException("User not found with email: " + email); // Return null only not exception
+            return null;
         }
 
 
@@ -133,14 +133,24 @@ public class UserDAOImpl implements UserDAO {
                 .setParameter("updatedAt", LocalDateTime.now())
                 .setParameter("id", user.getId())
                 .executeUpdate();
+    }
+
+    @Override
+    public int countUsers() {
+        return entityManager
+                .createQuery("SELECT COUNT(u) FROM User u WHERE u.isDeleted = false", Long.class)
+                .getSingleResult()
+                .intValue();
 
     }
 
     @Override
-    public Long countUsers() {
-        return entityManager
-                .createQuery("SELECT COUNT(u) FROM User u WHERE u.isDeleted = false", Long.class)
+    public boolean existsByEmail(String email) {
+        Long count = entityManager
+                .createQuery("SELECT COUNT(U) FROM User u WHERE u.email = :email", Long.class)
+                .setParameter("email", email)
                 .getSingleResult();
 
+        return count > 0;
     }
 }

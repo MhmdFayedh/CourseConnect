@@ -7,16 +7,21 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.parameters.P;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import sa.mhmdfayedh.CourseConnect.common.PasswordUtil;
+import sa.mhmdfayedh.CourseConnect.common.exceptions.*;
+import sa.mhmdfayedh.CourseConnect.common.utils.AuthUtil;
+import sa.mhmdfayedh.CourseConnect.common.utils.PaginationUtils;
+import sa.mhmdfayedh.CourseConnect.common.utils.PasswordUtil;
 import sa.mhmdfayedh.CourseConnect.common.enums.RoleEnum;
 import sa.mhmdfayedh.CourseConnect.common.mappers.UserMapper;
 import sa.mhmdfayedh.CourseConnect.dto.v1.*;
-import sa.mhmdfayedh.CourseConnect.common.exceptions.UserNotFoundException;
 import sa.mhmdfayedh.CourseConnect.entities.Gender;
 import sa.mhmdfayedh.CourseConnect.entities.Role;
 import sa.mhmdfayedh.CourseConnect.entities.User;
@@ -38,75 +43,108 @@ public class UserServiceImpl implements UserService {
     private final CacheManager cacheManager;
     private final JwtFilter jwtFilter;
     private final AuthenticationManager authenticationManager;
+    private final AuthUtil authUtil;
 
 
 
     @Autowired
-    public UserServiceImpl(UserDAO userDAO, RoleService roleService, GenderService genderService, CacheManager cacheManager,  JwtFilter jwtFilter, AuthenticationManager authenticationManager){
+    public UserServiceImpl(UserDAO userDAO,
+                           RoleService roleService,
+                           GenderService genderService,
+                           CacheManager cacheManager,
+                           JwtFilter jwtFilter,
+                           AuthenticationManager authenticationManager,
+                           AuthUtil authUtil){
         this.userDAO = userDAO;
         this.roleService = roleService;
         this.genderService = genderService;
         this.cacheManager = cacheManager;
         this.jwtFilter = jwtFilter;
         this.authenticationManager = authenticationManager;
+        this.authUtil = authUtil;
     }
 
 
-    public RegisterUserResponseDTO registerUser(CreateUserRequestDTO userDTO){
-        if (userDTO == null) {
-            throw new IllegalArgumentException("User cannot be null");
+    public ResponseDTO<UserDTO> registerUser(CreateUserRequestDTO request){
+        if (request == null) {
+            throw new IllegalArgumentException("Request cannot be null");
         }
 
-        Role role = roleService.findRoleById(userDTO.getRoleId());
-        Gender gender = genderService.findGenderById(userDTO.getGenderId());
+        if (userDAO.existsByEmail(request.getEmail())) {
+            throw new EmailAlreadyExistsException("Email address is not available");
+        }
+
+        Role role = roleService.findRoleById(request.getRoleId());
+        Gender gender = genderService.findGenderById(request.getGenderId());
+
+        if (role == null ) {
+            throw new RoleNotFoundException("Role not found with ID: " + request.getRoleId());
+        }
+
+        if (gender == null) {
+            throw new GenderNotFoundException("Gender not found with ID: " + request.getGenderId());
+        }
+
 
         if (role.getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("Cannot register as admin");
+            throw new CannotRegisterAsAdminException("Cannot register user with admin role");
         }
 
-        String hashedPassword = PasswordUtil.hash(userDTO.getPassword());
-        userDTO.setPassword("{bcrypt}" + hashedPassword);
+        String hashedPassword = PasswordUtil.hash(request.getPassword());
+        request.setPassword("{bcrypt}" + hashedPassword);
 
-        User mppedUser = UserMapper.toEntity(userDTO);
+        User mappedUser  = UserMapper.toEntity(request);
 
+        mappedUser.setRole(role);
+        mappedUser.setGender(gender);
 
-        mppedUser.setRole(role);
-        mppedUser.setGender(gender);
+        User user = this.userDAO.save(mappedUser);
 
-
-        User user = this.userDAO.save(mppedUser);
-
-        RegisterUserResponseDTO dto = new RegisterUserResponseDTO();
-
-
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.CREATED.value());
-        dto.setMessage("User Created Successfully");
-        dto.setData(UserMapper.toDTOList(List.of(user)));
-
-        return dto;
+        return ResponseDTO
+                .<UserDTO>builder()
+                .statusCode(HttpStatus.CREATED.value())
+                .message("User Created Successfully")
+                .data(UserMapper.toDTOList(List.of(user)))
+                .build();
     }
 
-    public LoginResponaceDTO loginUser(LoginRequestDTO requestDTO) {
-        Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(requestDTO.getEmail(), requestDTO.getPassword()
-                )
-        );
+    public LoginResponaceDTO loginUser(LoginRequestDTO request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Login request cannot be null");
+        }
 
-        User user = userDAO.findByEmail(requestDTO.getEmail());
-        Role role = roleService.findRoleById(user.getRole().getId());
+        try {
+            Authentication auth = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()
+                    )
+            );
 
-        String token = jwtFilter.generateToken(user.getEmail(), role.getName());
 
-        return new LoginResponaceDTO(requestDTO.getEmail(), token);
+            String role = auth.getAuthorities()
+                    .stream()
+                    .findFirst()
+                    .map(GrantedAuthority::getAuthority)
+                    .orElse(null);
 
+            if (role == null) {
+                throw new InvalidCredentialsException("Invalid email or password");
+            }
+
+            String token = jwtFilter.generateToken(auth.getName(), role);
+
+            return new LoginResponaceDTO(request.getEmail(), token);
+
+        } catch (UsernameNotFoundException
+                 | BadCredentialsException
+                 | DisabledException
+                 | UserNotFoundException e) {
+            throw new InvalidCredentialsException("Invalid email or password");
+        }
     }
 
-    public GetUsersResponseDTO findAllUsers(int pageNumber, String sort){
+    public ResponseDTO<UserDTO> findAllUsers(int pageNumber, String sort){
         List<User> users;
-        Long UsersCount = userDAO.countUsers();
-
+        int usersCount = userDAO.countUsers();
 
         if (sort != null && !sort.isBlank()) {
             users = userDAO.findAll(pageNumber, sort);
@@ -114,37 +152,27 @@ public class UserServiceImpl implements UserService {
             users = userDAO.findAll(pageNumber);
         }
 
-
-
-
         if (users == null){
             users = Collections.emptyList();
         }
 
         String message = users.isEmpty() ? "Users not found" : "Users retrieved successfully";
 
+        PaginationDTO pagination = PaginationUtils
+                .createPagination(users,
+                        usersCount,
+                        pageNumber,
+                        30);
 
-        GetUsersResponseDTO dto = new GetUsersResponseDTO();
-        PaginationDTO pagination = new PaginationDTO();
-
-        pagination.setSize(users.size());
-        pagination.setTotalElements(UsersCount);
-        pagination.setTotalPages((UsersCount + 30 - 1) / 30);
-        pagination.setPage(pageNumber);
-        pagination.setFirst(pageNumber == 1);
-        pagination.setLast(pageNumber == (UsersCount + 30 - 1) / 30 );
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage(message);
-        dto.setPagination(pagination);
-        dto.setData(UserMapper.toDTOList(users));
-
-
-        return dto;
+        return ResponseDTO
+                .<UserDTO>builder()
+                .message(message)
+                .data(UserMapper.toDTOList(users)).
+                pagination(pagination)
+                .build();
     }
 
-    public GetUserResponseDTO findUserById(int id){
+    public ResponseDTO<UserDTO> findUserById(int id){
         Cache userCache = cacheManager.getCache("userCache");
         UserDTO userDTO = userCache != null ? userCache.get(id, UserDTO.class) : null;
 
@@ -157,18 +185,15 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        GetUserResponseDTO dto = new GetUserResponseDTO();
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("User retrieved successfully");
-        dto.setData(List.of(userDTO));
-
-        return dto;
+        return ResponseDTO
+                .<UserDTO>builder()
+                .message("User retrieved successfully")
+                .data(List.of(userDTO))
+                .build();
     }
 
 
-    public UpdateUserResponseDTO updateUser(UpdateUserRequestDTO  userRequestDTO){
+    public ResponseDTO<UserDTO> updateUser(UpdateUserRequestDTO  userRequestDTO){
         if (userRequestDTO == null){
             throw new IllegalArgumentException("User cannot be null");
         }
@@ -177,62 +202,43 @@ public class UserServiceImpl implements UserService {
         Role role = roleService.findRoleById(userRequestDTO.getRoleId());
         Gender gender = genderService.findGenderById(userRequestDTO.getGenderId());
 
-        User userEntity = UserMapper.toEntity(userRequestDTO);
         User user = userDAO.findById(userRequestDTO.getId());
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser  = userDAO.findByEmail(authentication.getName());
+
+        authUtil.requireSelfOrAdmin(user.getId(), "You are not authorized to update another User");
 
 
-        if (user.getId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to update another User");
-        }
-
-        user.setUsername(userEntity.getUsername());
-        user.setEmail(userEntity.getEmail());
-        user.setFirstName(userEntity.getFirstName());
-        user.setLastName(userEntity.getLastName());
+        user.setUsername(userRequestDTO.getUsername());
+        user.setEmail(userRequestDTO.getEmail());
+        user.setFirstName(userRequestDTO.getFirstName());
+        user.setLastName(userRequestDTO.getLastName());
         user.setRole(role);
-        user.setBackground(userEntity.getBackground());
+        user.setBackground(userRequestDTO.getBackground());
         user.setGender(gender);
-        user.setDateOfBirth(userEntity.getDateOfBirth());
+        user.setDateOfBirth(userRequestDTO.getDateOfBirth());
         user.setUpdatedAt(LocalDateTime.now());
 
         this.userDAO.update(user);
 
         Cache cache = cacheManager.getCache("userCache");
         if (cache != null){
-            cache.put(user.getId(), user);
+            cache.put(user.getId(), UserMapper.toDTO(user));
         }
 
-
-        UpdateUserResponseDTO dto = new UpdateUserResponseDTO();
-
-
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("User updated successfully");
-        dto.setData(UserMapper.toDTOList(List.of(user)));
-
-        return dto;
+        return ResponseDTO
+                .<UserDTO>builder()
+                .message("User updated successfully")
+                .data(UserMapper.toDTOList(List.of(user)))
+                .build();
     }
 
-    public DeleteUserResponseDTO deleteUser(int id)  {
+    public ResponseDTO<UserDTO> deleteUser(int id)  {
         User user = userDAO.findById(id);
         if (user == null){
             throw new UserNotFoundException("Cannot delete user due to user not found");
         }
 
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser  = userDAO.findByEmail(authentication.getName());
-
-
-        if (user.getId() != currentUser.getId()
-                && !currentUser.getRole().getName().equals(RoleEnum.ROLE_ADMIN.getDisplyName())) {
-            throw new RuntimeException("You are not authorized to delete another User");
-        }
+        authUtil.requireSelfOrAdmin(user.getId(), "You are not authorized to delete another User");
 
         this.userDAO.deleteById(id);
 
@@ -241,11 +247,11 @@ public class UserServiceImpl implements UserService {
             cache.evict(id);
         }
 
-        DeleteUserResponseDTO dto = new DeleteUserResponseDTO();
-        dto.setStatus("success");
-        dto.setStatusCode(HttpStatus.OK.value());
-        dto.setMessage("User deleted successfully");
+        return ResponseDTO
+                .<UserDTO>builder()
+                .message("User deleted successfully")
+                .build();
 
-        return dto;
+
     }
 }

@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -38,17 +39,15 @@ public class SecurityConfig {
 
 
         return httpSecurity.csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stop Spring from creating Session since it's stateless
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/users/login",
                                 "/api/v1/users/register",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
-                                "/swagger-ui/**", // TODO Add login page
+                                "/swagger-ui/**",
                                 "/docs",
-                                "/actuator/health",
-                                "/api/admin/system-metrics",
-                                "/api/v1/courses")
+                                "/actuator/health")
                         .permitAll()
                         .anyRequest()
                         .authenticated())
@@ -77,18 +76,17 @@ public class SecurityConfig {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");
 
-            ErrorResponseDTO error = new ErrorResponseDTO(
-                    HttpServletResponse.SC_FORBIDDEN,
-                    "Forbidden",
-                    "You do not have permission to access this resource."
-            );
+            ErrorResponseDTO error = ErrorResponseDTO
+                    .builder()
+                    .status(HttpStatus.FORBIDDEN
+                            .value())
+                    .error("Forbidden")
+                    .message("You do not have permission to access this resource.")
+                    .build();
 
             ObjectMapper mapper = new ObjectMapper();
             response.getWriter().write(mapper.writeValueAsString(error));
         };
     }
-
-
-
 
 }

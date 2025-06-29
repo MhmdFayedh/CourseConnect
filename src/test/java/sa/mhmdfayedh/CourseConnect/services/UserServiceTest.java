@@ -11,7 +11,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import sa.mhmdfayedh.CourseConnect.common.PasswordUtil;
+import sa.mhmdfayedh.CourseConnect.common.utils.AuthUtil;
+import sa.mhmdfayedh.CourseConnect.common.utils.PasswordUtil;
 import sa.mhmdfayedh.CourseConnect.dto.v1.*;
 import sa.mhmdfayedh.CourseConnect.common.exceptions.UserNotFoundException;
 import sa.mhmdfayedh.CourseConnect.entities.Course;
@@ -53,6 +54,8 @@ class UserServiceTest {
     private JwtFilter jwtFilter;
     @Mock
     private AuthenticationManager authenticationManager;
+    @Mock
+    private AuthUtil authUtil;
 
 
 
@@ -67,7 +70,7 @@ class UserServiceTest {
         genderService = new GenderServiceImpl(genderDAO) {
         };
         roleService = new RoleServiceImpl(roleDAO);
-        userService = new UserServiceImpl(userDAO, roleService, genderService, cacheManager, jwtFilter, authenticationManager);
+        userService = new UserServiceImpl(userDAO, roleService, genderService, cacheManager, jwtFilter, authenticationManager, authUtil);
     }
 
 
@@ -113,20 +116,24 @@ class UserServiceTest {
         savedUser.setGender(new Gender());
 
         when(userDAO.save(any(User.class))).thenReturn(savedUser);
-        when(genderService.findGenderById(requestDTO.getRoleId())).thenReturn(gender);
+        when(genderService.findGenderById(requestDTO.getGenderId())).thenReturn(gender);
         when(roleService.findRoleById(requestDTO.getRoleId())).thenReturn(role);
         // Act
-        RegisterUserResponseDTO response;
+        ResponseDTO<UserDTO> response;
         try (MockedStatic<PasswordUtil> passwordUtilMock = mockStatic(PasswordUtil.class)) {
             passwordUtilMock.when(() -> PasswordUtil.hash("User123@")).thenReturn("encoded123");
             response = userService.registerUser(requestDTO);
         }
 
         // Assert
+        UserDTO userDTO = response.getData().get(0);
         assertEquals("success", response.getStatus());
         assertEquals(201, response.getStatusCode()); // Or HttpStatus.CREATED.value()
         assertNotNull(response.getData());
-        assertEquals("yasser", response.getData().get(0).getUsername());
+        assertEquals("yasser", userDTO.getUsername());
+        assertEquals("yasser@gmail.com", userDTO.getEmail());
+        assertEquals("Yasser", userDTO.getFirstName());
+        assertEquals("AlShammari", userDTO.getLastName());
 
         verify(userDAO).save(any(User.class));
 
@@ -134,7 +141,6 @@ class UserServiceTest {
 
     @Test
     void shouldThrowIllegalArgumentException_whenCreateUserRequestIsNull() {
-
         assertThrows(IllegalArgumentException.class, () -> {
             userService.registerUser(null);
         });
@@ -158,7 +164,7 @@ class UserServiceTest {
         when(userDAO.findAll(1)).thenReturn(users);
 
         // Act
-        GetUsersResponseDTO responseDTO = userService.findAllUsers(1, "");
+        ResponseDTO<UserDTO> responseDTO = userService.findAllUsers(1, "");
 
         // Assert
 
@@ -176,7 +182,7 @@ class UserServiceTest {
         when(userDAO.findAll()).thenReturn(Collections.emptyList());
 
         // Act
-        GetUsersResponseDTO responseDTO = userService.findAllUsers(1, "");
+        ResponseDTO<UserDTO> responseDTO = userService.findAllUsers(1, "");
 
         // Assert
         assertEquals("success", responseDTO.getStatus());
@@ -193,7 +199,7 @@ class UserServiceTest {
         when(userDAO.findAll(1)).thenReturn(users);
 
         // Act
-        GetUsersResponseDTO responseDTO = userService.findAllUsers(1, "");
+        ResponseDTO<UserDTO> responseDTO = userService.findAllUsers(1, "");
 
         // Assert
 
@@ -221,7 +227,7 @@ class UserServiceTest {
 
 
         // Act
-        GetUserResponseDTO responseDTO = userService.findUserById(1);
+        ResponseDTO<UserDTO> responseDTO = userService.findUserById(1);
 
 
         // Assert
@@ -282,7 +288,7 @@ class UserServiceTest {
 
         when(userDAO.findById(1)).thenReturn(user);
 
-        UpdateUserResponseDTO responseDTO = userService.updateUser(requestDTO);
+        ResponseDTO<UserDTO> responseDTO = userService.updateUser(requestDTO);
 
 
         assertEquals("success", responseDTO.getStatus());
@@ -344,7 +350,7 @@ class UserServiceTest {
         doNothing().when(userDAO).deleteById(userId);
 
         // Act
-        DeleteUserResponseDTO response = userService.deleteUser(userId);
+        ResponseDTO<UserDTO> response = userService.deleteUser(userId);
 
         // Assert
         assertNotNull(response);

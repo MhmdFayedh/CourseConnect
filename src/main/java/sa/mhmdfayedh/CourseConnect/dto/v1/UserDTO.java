@@ -1,11 +1,15 @@
 package sa.mhmdfayedh.CourseConnect.dto.v1;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import sa.mhmdfayedh.CourseConnect.entities.User;
 
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@Data
+@NoArgsConstructor
 public class UserDTO implements Serializable {
     private int id;
     private String username;
@@ -19,9 +23,6 @@ public class UserDTO implements Serializable {
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
 
-    public UserDTO(){
-
-    }
 
 
     public UserDTO(User user) {
@@ -38,91 +39,4 @@ public class UserDTO implements Serializable {
         this.createdAt = user.getCreatedAt();
     }
 
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public int getRoleID() {
-        return roleID;
-    }
-
-    public void setRoleID(int roleID) {
-        this.roleID = roleID;
-    }
-
-    public String getBackground() {
-        return background;
-    }
-
-    public void setBackground(String background) {
-        this.background = background;
-    }
-
-    public int getGenderId() {
-        return genderId;
-    }
-
-    public void setGenderId(int genderId) {
-        this.genderId = genderId;
-    }
-
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
-    }
-
-    public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 }

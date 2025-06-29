@@ -15,7 +15,7 @@ import sa.mhmdfayedh.CourseConnect.services.v1.impl.UserServiceImpl;
 
 @RestController
 @RequestMapping("/api/v1/users")
-@Tag(name = "User Management", description = "Operations related to Users")
+@Tag(name = "User Management V1", description = "Operations related to Users - V1")
 public class UserControllerImpl implements UserController {
     private final UserServiceImpl userService;
     private final JwtFilter jwtFilter;
@@ -43,43 +43,43 @@ public class UserControllerImpl implements UserController {
             @RequestParam(defaultValue = "1") int pageNumber,
             @Parameter(description = "Sort order of courses, e.g., 'title' or 'price'")
             @RequestParam(required = false) String sort){
-        GetUsersResponseDTO responseDTO = this.userService.findAllUsers(pageNumber, sort);
+        ResponseDTO<UserDTO> response = this.userService.findAllUsers(pageNumber, sort);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
 
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody @Valid CreateUserRequestDTO user){
-        RegisterUserResponseDTO responseDTO = userService.registerUser(user);
+    public ResponseEntity<?> registerUser(@RequestBody @Valid CreateUserRequestDTO request){
+        ResponseDTO<UserDTO> response = userService.registerUser(request);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR', 'STUDENT')")
     public ResponseEntity<?> getUser(@Parameter(description = "User ID", example = "3")
                                          @PathVariable int id){
-        GetUserResponseDTO responseDTO = userService.findUserById(id);
+        ResponseDTO<UserDTO> response = userService.findUserById(id);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
     public ResponseEntity<?> updateUser(@Valid @RequestBody UpdateUserRequestDTO user){
-        UpdateUserResponseDTO responseDTO = userService.updateUser(user);
+        ResponseDTO<UserDTO> response = userService.updateUser(user);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR', 'STUDENT')")
     public ResponseEntity<?> deleteUser(@Parameter(description = "User ID", example = "3")
                                             @PathVariable int id){
-        DeleteUserResponseDTO responseDTO = this.userService.deleteUser(id);
+        ResponseDTO<UserDTO> response = this.userService.deleteUser(id);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(response);
     }
 
 }

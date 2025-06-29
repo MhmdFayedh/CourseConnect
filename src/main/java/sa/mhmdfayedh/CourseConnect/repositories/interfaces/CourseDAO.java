@@ -16,5 +16,5 @@ public interface CourseDAO {
     List<Course> findCourseByTitle(String title, int pageNumber);
     List<Course> findCourseByTitleAndPrice(String title, Double price, int pageNumber);
     List<Course> findCourseByPrice(double price, int pageNumber);
-    Long countCourses();
+    int countCourses();
 }

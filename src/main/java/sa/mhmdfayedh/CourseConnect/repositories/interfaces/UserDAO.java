@@ -13,5 +13,6 @@ public interface UserDAO {
     User save(User user);
     void update(User user);
     void deleteById(int id);
-    Long countUsers();
+    int countUsers();
+    boolean existsByEmail(String email);
 }

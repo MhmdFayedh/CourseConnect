@@ -11,7 +11,6 @@ public class UpdateUserRequestDTO {
     private String username;
     @NotBlank(message = "Email cannot be empty")
     @Email(message = "Email not valid")
-//    @Pattern("") TODO: Regex
     private String email;
     @NotBlank(message = "firstname cannot be empty")
     private String firstName;

@@ -164,8 +164,11 @@ public class CourseDAOImpl implements CourseDAO {
     }
 
     @Override
-    public Long countCourses() {
-        return entityManager.createQuery("SELECT COUNT(c) FROM Course c WHERE c.isDeleted = false", Long.class).getSingleResult();
+    public int countCourses() {
+        return entityManager
+                .createQuery("SELECT COUNT(c) FROM Course c WHERE c.isDeleted = false", Long.class)
+                .getSingleResult()
+                .intValue();
     }
 
 

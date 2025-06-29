@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -55,32 +56,13 @@ public class JwtFilter extends OncePerRequestFilter {
                 String username = claims.get("email", String.class);
 
                 if (username != null) {
-                    try {
                         User user = userDAO.findByEmail(username);
                         if (user == null || user.isDeleted()) {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            ErrorResponseDTO error = new ErrorResponseDTO(HttpServletResponse.SC_UNAUTHORIZED,
-                                    "Unauthorized",
-                                    "User not found or account deleted");
-
-                            ObjectMapper mapper = new ObjectMapper();
-                            response.getWriter().write(mapper.writeValueAsString(error));
+                            sendErrorResponse(response, "Invalid or expired token");
                             return;
                         }
-                    } catch (UserNotFoundException e) {
-                        response.setContentType("application/json");
-                        ErrorResponseDTO error = new ErrorResponseDTO(HttpServletResponse.SC_UNAUTHORIZED,
-                                "Unauthorized",
-                                "User not found or account deleted");
-
-                        ObjectMapper mapper = new ObjectMapper();
-                        response.getWriter().write(mapper.writeValueAsString(error));
-                        return;
-                    }
-
-
                 }
+
 
                 List<String> roles = Arrays.stream(claims.get("role", String.class).split(",")).toList();
 
@@ -96,7 +78,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 }
 
             } catch (JwtException e) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                sendErrorResponse(response, "Invalid or expired token");
                 return;
             }
         }
@@ -116,5 +98,19 @@ public class JwtFilter extends OncePerRequestFilter {
                 .setExpiration(new Date(System.currentTimeMillis() + 86400000))
                 .signWith(key)
                 .compact();
+    }
+
+    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+
+        ErrorResponseDTO error = ErrorResponseDTO.builder()
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .message(message)
+                .error("Unauthorized")
+                .build();
+
+        ObjectMapper mapper = new ObjectMapper();
+        response.getWriter().write(mapper.writeValueAsString(error));
     }
 }

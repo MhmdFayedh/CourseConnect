@@ -13,11 +13,11 @@ public class KeyConfig {
 
 
     @Value("${app.api.config.secret.key}")
-    private String secret;
+    private String key;
 
     @Bean
     public Key key() {
-        return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        return new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
 }
