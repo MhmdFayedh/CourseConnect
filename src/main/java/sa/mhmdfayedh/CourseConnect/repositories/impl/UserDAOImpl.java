@@ -147,7 +147,7 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public boolean existsByEmail(String email) {
         Long count = entityManager
-                .createQuery("SELECT COUNT(U) FROM User u WHERE u.email = :email", Long.class)
+                .createQuery("SELECT COUNT(u) FROM User u WHERE u.email = :email", Long.class)
                 .setParameter("email", email)
                 .getSingleResult();
 
